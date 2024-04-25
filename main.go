@@ -2,14 +2,16 @@ package main
 
 import (
 	// "bytes"
+	"errors"
 	"fmt"
 	// "io"
-	"golang.org/x/net/html"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
+
+	"golang.org/x/net/html"
 )
 
 func main() {
@@ -84,38 +86,49 @@ func PrintTextFromBody(n *html.Node, depth int) {
 	}
 
 	indent := strings.Repeat(" ", depth*2)
+	content, err := getTextContent(n)
+	if err != nil {
+		// temp solution will be changed
+		goto emptyString
+	}
 
 	if n.Type == html.ElementNode {
 		switch n.Data {
 		case "h1", "h2", "h3":
-			fmt.Printf("%sHeader: %s\n", indent, getTextContent(n))
+			fmt.Printf("%sHeader: %s\n", indent, content)
 		case "p", "span":
-			fmt.Printf("%sParagraph: %s\n", indent, getTextContent(n))
+			fmt.Printf("%sParagraph: %s\n", indent, content)
 		case "li":
-			fmt.Printf("%sList Item: %s\n", indent, getTextContent(n))
-		case "table":
-			fmt.Printf("%sTable:\n", indent)
-		case "tr":
-			fmt.Printf("%sTableRow:\n", indent)
+			fmt.Printf("%sList Item: %s\n", indent, content)
 		case "th":
-			fmt.Printf("%sTableHeader: %s\n", indent, getTextContent(n))
+			fmt.Printf("%sTableHeader: %s\n", indent, content)
 		case "td":
-			fmt.Printf("%sTableCell: %s\n", indent, getTextContent(n))
+			fmt.Printf("%sTableCell: %s\n", indent, content)
 		}
 	}
 
+emptyString:
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		PrintTextFromBody(c, depth+1)
 	}
 }
 
-func getTextContent(n *html.Node) string {
+func getTextContent(n *html.Node) (string, error) {
 	if n.Type == html.TextNode {
-		return strings.TrimSpace(n.Data)
+		return strings.TrimSpace(n.Data), nil
 	}
 	content := ""
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		content += getTextContent(c) + " "
+		val, err := getTextContent(c)
+		if err != nil {
+			continue
+		}
+		content += val
 	}
-	return strings.TrimSpace(content)
+
+	if content == "" {
+		return "", errors.New("empty string")
+	}
+
+	return strings.TrimSpace(content), nil
 }
